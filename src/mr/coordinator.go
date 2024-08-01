@@ -1,15 +1,20 @@
 package mr
 
+import "fmt"
 import "log"
 import "net"
 import "os"
 import "net/rpc"
 import "net/http"
 
+type task struct {
+  filename string
+  status int  // 0: not started, 1: started, 2: done.
+}
 
 type Coordinator struct {
-	// Your definitions here.
-
+  tasks []task
+  current int  // stores the current index of the tasks list.
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -23,7 +28,6 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil
 }
-
 
 //
 // start a thread that listens for RPCs from worker.go
@@ -62,8 +66,13 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
-	// Your code here.
+  for _, name := range files {
+    t := task{name, 0}
+    c.tasks = append(c.tasks, t)
+  }
+  c.current = 0
 
+  fmt.Println(c)
 
 	c.server()
 	return &c
