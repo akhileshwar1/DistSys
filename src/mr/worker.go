@@ -35,7 +35,24 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// uncomment to send the Example RPC to the coordinator.
 	CallExample()
+  filename, content := CallGet()
+  if content == ""{
+    fmt.Println("content is nil")
+  }
+  kva := mapf(filename, content)
+  fmt.Println("kva is ", kva)
+}
 
+func CallGet() (string, string){
+	reply := TaskReply{} 
+  ok := call("Coordinator.GetTask", new(struct {}), &reply)
+  if ok {
+    fmt.Printf("contents are %s", reply)
+    return reply.Filename, reply.Content
+  } else {
+    fmt.Println("error is ", ok)
+    return "", "" 
+  }
 }
 
 //

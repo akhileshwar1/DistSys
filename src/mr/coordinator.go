@@ -6,6 +6,8 @@ import "net"
 import "os"
 import "net/rpc"
 import "net/http"
+import "errors"
+import "io/ioutil"
 
 type task struct {
   filename string
@@ -27,6 +29,29 @@ type Coordinator struct {
 func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil
+}
+
+func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
+    if c.current >= len(c.tasks) {
+        return errors.New("No tasks available")
+    }
+
+    filename := c.tasks[c.current].filename
+    file, err := os.Open(filename)
+    if err != nil {
+        return errors.New("cannot open " + filename)
+    }
+    defer file.Close()  // Ensure the file is closed even if there's an error
+
+    content, err := ioutil.ReadAll(file)
+    if err != nil {
+        return errors.New("cannot read " + filename)
+    }
+
+    reply.Filename = filename
+    reply.Content = string(content)
+    c.current++  // Move to the next task
+    return nil
 }
 
 //
