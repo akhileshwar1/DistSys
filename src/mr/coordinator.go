@@ -51,7 +51,6 @@ func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
 
     reply.Filename = filename
     reply.Content = string(content)
-    reply.TaskNo = c.current
     reply.Nreduce = c.nReduce
     c.current++  // Move to the next task
     return nil

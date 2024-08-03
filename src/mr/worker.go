@@ -3,6 +3,7 @@ package mr
 import "os"
 import "encoding/json"
 import "fmt"
+import "time"
 import "log"
 import "net/rpc"
 import "hash/fnv"
@@ -30,17 +31,29 @@ func ihash(key string) int {
 //
 // main/mrworker.go calls this function.
 //
+
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-  filename, content, taskno, nReduce := CallGet()
+  x := 5
+  ticker := time.NewTicker(time.Duration(x) * time.Second)
+  defer ticker.Stop()
+  for range ticker.C {
+    fmt.Println("task received")
+    MapTask(mapf)
+  }
+}
+
+func MapTask(mapf func(string, string) []KeyValue) {
+  filename, content, nReduce := CallGet()
   if content == ""{
     fmt.Println("content is nil")
   }
   kva := mapf(filename, content)
   for _, kv := range kva {
     i := ihash(kv.Key) % nReduce
-    filename := fmt.Sprintf("mr-%d-%d", taskno, i)
+    filename := fmt.Sprintf("mr-%d", i)
     file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    defer file.Close()
     if (os.IsNotExist(err)) {
       file, err = os.Create(filename)
     }
@@ -52,15 +65,15 @@ func Worker(mapf func(string, string) []KeyValue,
   }
 }
 
-func CallGet() (string, string, int, int){
+func CallGet() (string, string, int){
 	reply := TaskReply{} 
   ok := call("Coordinator.GetTask", new(struct {}), &reply)
   if ok {
     // fmt.Printf("contents are %s", reply)
-    return reply.Filename, reply.Content, reply.TaskNo, reply.Nreduce
+    return reply.Filename, reply.Content, reply.Nreduce
   } else {
     fmt.Println("error is ", ok)
-    return "", "", 0, 0
+    return "", "", 0
   }
 }
 

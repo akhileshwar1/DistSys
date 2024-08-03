@@ -24,7 +24,6 @@ type ExampleReply struct {
 
 type TaskReply struct {
   Filename, Content string
-  TaskNo int
   Nreduce int
 }
 
