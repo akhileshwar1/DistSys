@@ -1,5 +1,7 @@
 package mr
 
+import "os"
+import "encoding/json"
 import "fmt"
 import "log"
 import "net/rpc"
@@ -30,28 +32,35 @@ func ihash(key string) int {
 //
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-
-	// Your worker implementation here.
-
-	// uncomment to send the Example RPC to the coordinator.
-	CallExample()
-  filename, content := CallGet()
+  filename, content, taskno, nReduce := CallGet()
   if content == ""{
     fmt.Println("content is nil")
   }
   kva := mapf(filename, content)
-  fmt.Println("kva is ", kva)
+  for _, kv := range kva {
+    i := ihash(kv.Key) % nReduce
+    filename := fmt.Sprintf("mr-%d-%d", taskno, i)
+    file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if (os.IsNotExist(err)) {
+      file, err = os.Create(filename)
+    }
+
+    // we have the file now, just write the key value pair as json to the file.
+    // at the end we will have all the words distributed among nReduce files.
+    enc := json.NewEncoder(file)
+    enc.Encode(&kv)
+  }
 }
 
-func CallGet() (string, string){
+func CallGet() (string, string, int, int){
 	reply := TaskReply{} 
   ok := call("Coordinator.GetTask", new(struct {}), &reply)
   if ok {
-    fmt.Printf("contents are %s", reply)
-    return reply.Filename, reply.Content
+    // fmt.Printf("contents are %s", reply)
+    return reply.Filename, reply.Content, reply.TaskNo, reply.Nreduce
   } else {
     fmt.Println("error is ", ok)
-    return "", "" 
+    return "", "", 0, 0
   }
 }
 

@@ -24,6 +24,8 @@ type ExampleReply struct {
 
 type TaskReply struct {
   Filename, Content string
+  TaskNo int
+  Nreduce int
 }
 
 // Cook up a unique-ish UNIX-domain socket name
