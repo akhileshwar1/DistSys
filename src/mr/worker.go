@@ -38,7 +38,6 @@ func Worker(mapf func(string, string) []KeyValue,
   ticker := time.NewTicker(time.Duration(x) * time.Second)
   defer ticker.Stop()
   for range ticker.C {
-    fmt.Println("task received")
     MapTask(mapf)
   }
 }
@@ -47,7 +46,9 @@ func MapTask(mapf func(string, string) []KeyValue) {
   filename, content, nReduce := CallGet()
   if content == ""{
     fmt.Println("content is nil")
+    return
   }
+  fmt.Println("task received")
   kva := mapf(filename, content)
   for _, kv := range kva {
     i := ihash(kv.Key) % nReduce

@@ -8,6 +8,7 @@ import "net/rpc"
 import "net/http"
 import "errors"
 import "io/ioutil"
+import "sync"
 
 type task struct {
   filename string
@@ -15,6 +16,7 @@ type task struct {
 }
 
 type Coordinator struct {
+  mu sync.Mutex
   tasks []task
   current int  // stores the current index of the tasks list.
   nReduce int  // no of nReduce files to distribute the keys to.
@@ -33,6 +35,8 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 }
 
 func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
+    c.mu.Lock()
+    defer c.mu.Unlock()
     if c.current >= len(c.tasks) {
         return errors.New("No tasks available")
     }
