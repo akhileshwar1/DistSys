@@ -76,12 +76,11 @@ func (c *Coordinator) server() {
 // if the entire job has finished.
 //
 func (c *Coordinator) Done() bool {
-	ret := false
+  if c.current >= len(c.tasks) {
+    return true
+  }
 
-	// Your code here.
-
-
-	return ret
+	return false
 }
 
 //
