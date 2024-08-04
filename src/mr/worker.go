@@ -9,6 +9,7 @@ import "net/rpc"
 import "hash/fnv"
 import "strings"
 import "strconv"
+import "sort" 
 
 // for sorting by key.
 type ByKey []KeyValue
@@ -114,6 +115,9 @@ func ReduceTask(reducef func(string, []string) string, filename string, content 
     }
     kva = append(kva, kv)
   }
+
+
+	sort.Sort(ByKey(kva))
 
 	// call Reduce on each distinct key in kva[],
 	// and print the result to ofile.
