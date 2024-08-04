@@ -23,7 +23,7 @@ type ExampleReply struct {
 }
 
 type TaskReply struct {
-  Filename, Content string
+  Filename, Content, Operation string
   Nreduce int
 }
 

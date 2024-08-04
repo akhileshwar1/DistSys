@@ -13,6 +13,7 @@ import "sync"
 type task struct {
   filename string
   status int  // 0: not started, 1: started, 2: done.
+  operation string // "map" or "reduce"
 }
 
 type Coordinator struct {
@@ -22,13 +23,6 @@ type Coordinator struct {
   nReduce int  // no of nReduce files to distribute the keys to.
 }
 
-// Your code here -- RPC handlers for the worker to call.
-
-//
-// an example RPC handler.
-//
-// the RPC argument and reply types are defined in rpc.go.
-//
 func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Y = args.X + 1
 	return nil
@@ -56,6 +50,7 @@ func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
     reply.Filename = filename
     reply.Content = string(content)
     reply.Nreduce = c.nReduce
+    reply.Operation = c.tasks[c.current].operation
     c.current++  // Move to the next task
     return nil
 }
@@ -97,10 +92,21 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 
+  
+  // add map tasks
   for _, name := range files {
-    t := task{name, 0}
+    t := task{name, 0, "map"}
     c.tasks = append(c.tasks, t)
   }
+
+  // add reduce tasks
+  i := 0
+  for i < nReduce {
+    t := task{fmt.Sprintf("mr-%d", i), 0, "reduce"}
+    c.tasks = append(c.tasks, t)
+    i++
+  }
+
   c.current = 0
   c.nReduce = nReduce
 

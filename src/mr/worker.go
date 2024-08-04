@@ -7,11 +7,18 @@ import "time"
 import "log"
 import "net/rpc"
 import "hash/fnv"
+import "strings"
+import "strconv"
 
+// for sorting by key.
+type ByKey []KeyValue
 
-//
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
 // Map functions return a slice of KeyValue.
-//
 type KeyValue struct {
 	Key   string
 	Value string
@@ -38,12 +45,17 @@ func Worker(mapf func(string, string) []KeyValue,
   ticker := time.NewTicker(time.Duration(x) * time.Second)
   defer ticker.Stop()
   for range ticker.C {
-    MapTask(mapf)
+    filename, content, nReduce, operation := CallGet()
+    if (operation == "map") {
+      MapTask(mapf, filename, content, nReduce)
+    } else {
+      ReduceTask(reducef, filename, content, nReduce)
+    }
   }
 }
 
-func MapTask(mapf func(string, string) []KeyValue) {
-  filename, content, nReduce := CallGet()
+func MapTask(mapf func(string, string) []KeyValue, filename string, content string, 
+             nReduce int) {
   if content == ""{
     fmt.Println("content is nil")
     return
@@ -66,15 +78,76 @@ func MapTask(mapf func(string, string) []KeyValue) {
   }
 }
 
-func CallGet() (string, string, int){
+func ReduceTask(reducef func(string, []string) string, filename string, content string, 
+             nReduce int) {
+  if content == ""{
+    fmt.Println("content is nil")
+    return
+  }
+
+  // extract the no from filename
+  parts := strings.Split(filename, "-")
+  var num int
+  if len(parts) > 1 {
+    n, err := strconv.Atoi(parts[1])
+    num = n
+    if err != nil {
+      fmt.Println("Error converting to int:", err)
+    }
+  }
+
+  // read into kv slice from the input file.
+  oname := fmt.Sprintf("mr-out-%d", num)
+  fmt.Println(oname)
+	ofile, _ := os.Create(oname)
+  ifile, err := os.Open(filename)
+  if (err != nil) {
+    fmt.Println("cannot read input file")
+    return
+  }
+	kva := []KeyValue{}
+  dec := json.NewDecoder(ifile)
+  for {
+    var kv KeyValue
+    if err := dec.Decode(&kv); err != nil {
+      break
+    }
+    kva = append(kva, kv)
+  }
+
+	// call Reduce on each distinct key in kva[],
+	// and print the result to ofile.
+	i := 0
+	for i < len(kva) {
+		j := i + 1
+		for j < len(kva) && kva[j].Key == kva[i].Key {
+			j++
+		}
+		values := []string{}
+		for k := i; k < j; k++ {
+			values = append(values, kva[k].Value)
+		}
+		output := reducef(kva[i].Key, values)
+
+		// this is the correct format for each line of Reduce output.
+		fmt.Fprintf(ofile, "%v %v\n", kva[i].Key, output)
+
+		i = j
+	}
+
+	ofile.Close()
+}
+
+
+func CallGet() (string, string, int, string){
 	reply := TaskReply{} 
   ok := call("Coordinator.GetTask", new(struct {}), &reply)
   if ok {
     // fmt.Printf("contents are %s", reply)
-    return reply.Filename, reply.Content, reply.Nreduce
+    return reply.Filename, reply.Content, reply.Nreduce, reply.Operation
   } else {
     fmt.Println("error is ", ok)
-    return "", "", 0
+    return "", "", 0, ""
   }
 }
 
