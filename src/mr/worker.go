@@ -57,6 +57,7 @@ func Worker(mapf func(string, string) []KeyValue,
 
 func MapTask(mapf func(string, string) []KeyValue, filename string, content string, 
   nReduce int) {
+  time.Sleep(2 * time.Second)
   if content == ""{
     fmt.Println("content is nil")
     return

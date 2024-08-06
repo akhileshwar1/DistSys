@@ -9,6 +9,7 @@ import "net/http"
 import "errors"
 import "io/ioutil"
 import "sync"
+import "time"
 
 type Stack []task
 
@@ -29,10 +30,10 @@ func (s *Stack) pop() (task, bool) {
 
 // returns the removed task.
 func (s *Stack) remove(filename string) (task, bool) {
-  for i, task := range *s {
-    if task.filename == filename {
+  for i, t := range *s {
+    if t.filename == filename {
       *s = append((*s)[:i], (*s)[i+1:]...)
-      return task, true
+      return t, true
     }
   }
 
@@ -52,6 +53,7 @@ func (s *Stack) peek() (task, bool) {
 type task struct {
   filename string
   operation string // "map" or "reduce"
+  doneChan chan bool
 }
 
 type Coordinator struct {
@@ -70,15 +72,15 @@ func (c *Coordinator) Example(args *ExampleArgs, reply *ExampleReply) error {
 func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
   c.mu.Lock()
   defer c.mu.Unlock()
-  task, bool := c.notStartedTasks.pop()
-  if !bool {
+  task, boolean := c.notStartedTasks.pop()
+  if !boolean {
     return errors.New("No tasks available")
   }
 
   filename := task.filename
   file, err := os.Open(filename)
   if err != nil {
-    return errors.New("cannot open " + filename)
+    return errors.New("cannot open " + filename + task.operation)
   }
   defer file.Close()  // Ensure the file is closed even if there's an error
 
@@ -93,17 +95,33 @@ func (c *Coordinator) GetTask(args *struct{}, reply *TaskReply) error {
   reply.Operation = task.operation
 
   c.startedTasks.push(task) // push to started status.
+  go c.monitorTask(task) // start the timer.
   return nil
+}
+
+func (c *Coordinator) monitorTask(t task) {
+  select {
+  case done := <-t.doneChan:
+    if done {
+      fmt.Println("Task completed within 10 seconds!")
+    }
+  case <-time.After(10 * time.Second): // go from started to not started.
+    task, _ := c.startedTasks.remove(t.filename)
+    fmt.Println("Time limit exceeded")
+    c.notStartedTasks.push(task)
+  }
 }
 
 func (c *Coordinator) DoneTask(filename string, reply *TaskReply) error {
   task, bool := c.startedTasks.remove(filename)
+  fmt.Sprintf("Done Task %s", filename)
   if !bool {
     return errors.New("No such task")
   }
 
   // push it to the done stack.
   c.doneTasks.push(task)
+  task.doneChan <- true
   return nil
 }
 
@@ -148,16 +166,18 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
   // add reduce tasks
   i := 0
   for i < nReduce {
-    t := task{fmt.Sprintf("mr-%d", i), "reduce"}
+    t := task{fmt.Sprintf("mr-%d", i), "reduce", make(chan bool)}
     c.notStartedTasks.push(t)
     i++
   }
 
   // add map tasks
   for _, name := range files {
-    t := task{name, "map"}
+    t := task{name, "map", make(chan bool)}
     c.notStartedTasks.push(t)
   }
+
+  fmt.Println(c.notStartedTasks)
 
   c.nReduce = nReduce
   c.server()
